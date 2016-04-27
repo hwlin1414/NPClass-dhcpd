@@ -12,7 +12,7 @@ BUFSIZ = 4096
 
 pool = (
     ('192.168.1.0', '255.255.255.0', {
-        'ip': ('192.168.1.100', '192.168.1.101', '192.168.1.102'),
+        'ip': ('192.168.1.100', '192.168.1.101', '192.168.1.102', '192.168.1.103'),
         'options': {
             dhcp.OPTION_ROUTERS: ('192.168.1.1', ),
             dhcp.OPTION_DNS_SERVERS: ('168.95.1.1', '8.8.8.8'),
@@ -31,13 +31,18 @@ def main(args):
         (response, client) = sock.recvfrom(BUFSIZ)
         packet = dhcp.dhcp_packet_from(response)
         if packet is None: continue
-        print "packet from %s" % str(client)
+        print "%s from %s" % (dhcp.OPT53[packet.opt53], str(client))
         if args['debug']: print packet
         if packet.opt53 == dhcp.OPT53_DISCOVER:
             p = pool[0]
+            flag = False
             for ip in p[2]['ip']:
+                flag = True
                 if ip not in using: break
                 if using[ip]['time'] < int(time.time()): break
+                flag = False
+            if flag == False:
+                print "Warning: No IP available!"
             using[ip] = {'time': int(time.time()) + 3600, 'xid': packet.xid}
             options = []
             options.append(dhcp.dhcp_option(dhcp.OPTION_REQUESTED_ADDRESS, ip))
@@ -46,15 +51,17 @@ def main(args):
             for opt in opts:
                 options.append(dhcp.dhcp_option(opt, opts[opt]))
             pkt = dhcp.dhcp_packet(opt53 = dhcp.OPT53_OFFER, mac = packet.chaddr, options = options, xid = packet.xid)
-            print "replying..."
-            if args['debug']: print pkt
+            if args['debug']:
+                print "replying..."
+                print pkt
             sock.sendto(pkt.raw(), ('<broadcast>', 68))
         elif packet.opt53 == dhcp.OPT53_REQUEST:
             for u in using:
                 if using[u]['xid'] == packet.xid and using[u]['time'] > int(time.time()):
                     pkt = dhcp.dhcp_packet(opt53 = dhcp.OPT53_ACK, mac = packet.chaddr, options = options, xid = packet.xid)
-                    print "replying..."
-                    if args['debug']: print pkt
+                    if args['debug']:
+                        print "replying..."
+                        print pkt
                     sock.sendto(pkt.raw(), ('<broadcast>', 68))
                     break
 
