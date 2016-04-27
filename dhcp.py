@@ -73,7 +73,24 @@ DHCP_HEADER_LENGTH = struct.calcsize(DHCP_HEADER_FORMAT)
 __dhcp_struct__ = struct.Struct(DHCP_HEADER_FORMAT)
 
 def dhcp_option_from(raw):
-    pass
+    opt = ord(raw[0])
+    leng = ord(raw[1])
+    value = raw_options[2:leng+2]
+    if opt == 0: return (1, None)
+    elif opt == 255: return (0, None)
+    elif opt in (OPTION_MESSAGE_TYPE, ):
+        return (leng + 2, dhcp_option(opt, ord(value)))
+    elif opt in (OPTION_NETMASK, OPTION_SERVER_IDENTIFIER, OPTION_REQUESTED_ADDRESS):
+        return (leng + 2, dhcp_option(opt, socket.inet_ntoa(value)))
+    elif opt in (OPTION_ROUTERS, OPTION_NTP_SERVERS, OPTION_DNS_SERVERS):
+        iplist = []
+        for off in xrange(0, length/4):
+            iplist +=  [socket.inet_ntoa(value[off*4:off*4+4])]
+        return (leng + 2, dhcp_option(opt, iplist))
+    elif opt in (OPTION_LEASE_TIME, OPTION_RENEW_TIME, OPTION_REBIND_TIME):
+        return (leng + 2, dhcp_option(opt, struct.unpack("!I", value)[0]))
+    else:
+        return (leng + 2, dhcp_option(opt, value))
 
 class dhcp_option(object):
     def __init__(self, opt, arg):
@@ -83,23 +100,43 @@ class dhcp_option(object):
         return ("\t[options: %s, arg: %s]\n" % (OPTION[self.opt], self.arg))
     def raw(self):
         packet = ''
-        if code in (OPTION_MESSAGE_TYPE, ):
-            packet += (struct.pack("!3B", code ,1,value))
-        elif code in (OPTION_NETMASK, OPTION_SERVER_IDENTIFIER, OPTION_REQUESTED_ADDRESS):
-            packet += (struct.pack("!2B", code, 4)+socket.inet_aton(value))
-        elif code in (OPTION_ROUTERS, OPTION_NTP_SERVERS, OPTION_DNS_SERVERS):
-            if len(value) == 0: return ''
-            packet += (struct.pack("!2B", code, 4*len(value)))
-            for address in value:
+        if self.opt in (OPTION_MESSAGE_TYPE, ):
+            packet += (struct.pack("!3B", self.opt ,1,self.arg))
+        elif self.opt in (OPTION_NETMASK, OPTION_SERVER_IDENTIFIER, OPTION_REQUESTED_ADDRESS):
+            packet += (struct.pack("!2B", self.opt, 4)+socket.inet_aton(self.arg))
+        elif self.opt in (OPTION_ROUTERS, OPTION_NTP_SERVERS, OPTION_DNS_SERVERS):
+            if len(self.arg) == 0: return ''
+            packet += (struct.pack("!2B", self.opt, 4*len(self.arg)))
+            for address in self.arg:
                 packet += socket.inet_aton(address)
-        elif code in [OPTION_LEASE_TIME, OPTION_RENEW_TIME, OPTION_REBIND_TIME]:
-            packet += struct.pack("!2BI", code, 4, value)
+        elif self.opt in [OPTION_LEASE_TIME, OPTION_RENEW_TIME, OPTION_REBIND_TIME]:
+            packet += struct.pack("!2BI", self.opt, 4, self.arg)
         else:
-            packet += (struct.pack("!2B", code, len(value))+value)
+            packet += (struct.pack("!2B", self.opt, len(self.arg))+self.arg)
         return packet
 
 def dhcp_packet_from(raw):
-    pass
+    if len(raw) < DHCP_HEADER_LENGTH: return None
+    if raw_message[DHCP_HEADER_LENGTH:DHCP_HEADER_LENGTH+4] != MAGIC_COOKIE:
+        print("Magic Cookie Error!")
+        return None
+    offset = DHCP_HEADER_LENGTH+4
+    options = []
+    while offset < len(raw):
+        (leng, option) = dhcp_option_from(raw[offset:])
+        if leng == 0: break
+        options += option
+        offset += leng
+        return dhcp_packet(message_type=message_type, htype=raw[1],
+            hlen=raw[2], hops=raw[3],
+            xid=raw[4], secs=raw[5],
+            broadcast=True if raw[6]==1<<15 else False,
+            ciaddr=socket.inet_ntoa(raw[7]),
+            yiaddr=socket.inet_ntoa(raw[8]),
+            siaddr=socket.inet_ntoa(raw[9]),
+            giaddr=socket.inet_ntoa(raw[10]),
+            mac=raw[11][0:6].encode('hex'), sname=raw[12],
+            file=raw[13], options=options)
 
 class dhcp_packet(object):
     def __init__(self, opt53, mac, hlen=6, htype=1, hops=0, secs=0, xid=None, broadcast=True, 

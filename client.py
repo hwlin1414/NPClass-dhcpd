@@ -5,9 +5,9 @@ import argparse
 import socket
 import random
 import time
-import uuid
+import netifaces
 import struct
-import dhcp_packet
+import dhcp
 
 BUFSIZ = 4096
 
@@ -18,7 +18,7 @@ def main(args):
     sock.bind( ("", 68) )
     sock.settimeout(5)
 
-    packet = dhcp_packet.dhcp_packet(opt53 = dhcp_packet.OPT53_DISCOVER, mac = args['mac'])
+    packet = dhcp.dhcp_packet(opt53 = dhcp.OPT53_DISCOVER, mac = args['mac'])
     
     print "Sending DHCP Discover"
     print packet
@@ -32,12 +32,13 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DHCP Client')
     parser.add_argument('--mac', help='mac address')
-    parser.add_argument('interface', nargs='?', help='interface')
+    parser.add_argument('--rand-mac', action='store_true', help='mac address')
+    parser.add_argument('interface', help='interface')
     args = vars(parser.parse_args())
-    if args['interface'] is None and args['mac'] is None:
+    if args['rand_mac']:
         args['mac'] = ''.join(random.choice("abcdef0123456789") for _ in xrange(0,12))
     elif args['mac'] is None:
-        args['mac'] = hex(uuid.getnode())[2:].zfill(12)
+        args['mac'] = netifaces.ifaddresses(args['interface'])[netifaces.AF_LINK][0]['addr'].replace(":", "")
     print("dhcp client start with args: ")
     print(args)
     main(args)
