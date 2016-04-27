@@ -9,7 +9,7 @@ import dhcp
 import time
 
 BUFSIZ = 4096
-
+myaddr = '192.168.1.1'
 pools = (
     ({'circuit': 'u5566a'}, {
         'ip': ('140.123.239.230',),
@@ -101,11 +101,11 @@ def main(args):
                 print "Warning: No IP available!"
             using[ip] = {'time': int(time.time()) + args['lease'], 'xid': packet.xid}
             options = []
-            options.append(dhcp.dhcp_option(dhcp.OPTION_REQUESTED_ADDRESS, ip))
+            options.append(dhcp.dhcp_option(dhcp.OPTION_SERVER_IDENTIFIER, myaddr))
             opts = p[1]['options']
             for opt in opts:
                 options.append(dhcp.dhcp_option(opt, opts[opt]))
-            pkt = dhcp.dhcp_packet(opt53 = dhcp.OPT53_OFFER, mac = packet.chaddr, options = options, xid = packet.xid)
+            pkt = dhcp.dhcp_packet(opt53 = dhcp.OPT53_OFFER, yiaddr = ip, siaddr = myaddr, mac = packet.chaddr, options = options, xid = packet.xid)
             if args['debug']:
                 print "replying..."
                 print pkt
@@ -113,7 +113,7 @@ def main(args):
         elif packet.opt53 == dhcp.OPT53_REQUEST:
             for u in using:
                 if using[u]['xid'] == packet.xid and using[u]['time'] > int(time.time()):
-                    pkt = dhcp.dhcp_packet(opt53 = dhcp.OPT53_ACK, mac = packet.chaddr, options = options, xid = packet.xid)
+                    pkt = dhcp.dhcp_packet(opt53 = dhcp.OPT53_ACK, yiaddr = u, siaddr = myaddr, mac = packet.chaddr, options = options, xid = packet.xid)
                     if args['debug']:
                         print "replying..."
                         print pkt

@@ -19,12 +19,12 @@ def main(args):
     sock.bind( ("", 68) )
     sock.settimeout(5)
 
+    print "Sending DHCP Discover"
     options = []
     if args['circuit'] is not None:
         options.append(dhcp.dhcp_option(dhcp.OPTION_RELAY_AGENT, args['circuit']))
     packet = dhcp.dhcp_packet(opt53 = dhcp.OPT53_DISCOVER, mac = args['mac'], options = options)
     
-    print "Sending DHCP Discover"
     if args['debug']: print packet
     sock.sendto(packet.raw(), ("<broadcast>", 67))
 
@@ -36,23 +36,12 @@ def main(args):
         print "Timeout"
         return
     if args['debug']: print packet
-    print ""
-
-    option = packet.getopt(dhcp.OPTION_REQUESTED_ADDRESS)
-    if option is not None: print "Using IP Address: %s" % option.arg
-    option = packet.getopt(dhcp.OPTION_NETMASK)
-    if option is not None: print "Using Netmask: %s" % option.arg
-    option = packet.getopt(dhcp.OPTION_ROUTERS)
-    if option is not None: print "Using Routers: %s" % option.arg
-    option = packet.getopt(dhcp.OPTION_DNS_SERVERS)
-    if option is not None: print "Using DNS Servers: %s" % option.arg
-    option = packet.getopt(dhcp.OPTION_LEASE_TIME)
-    if option is not None: print "Using lease time: %s" % option.arg
-    print ""
 
     print "Sending DHCP Request"
+    options.append(dhcp.dhcp_option(dhcp.OPTION_REQUESTED_ADDRESS, packet.yiaddr))
+    options.append(dhcp.dhcp_option(dhcp.OPTION_SERVER_IDENTIFIER, packet.siaddr))
+    packet = dhcp.dhcp_packet(opt53 = dhcp.OPT53_REQUEST, mac = args['mac'], options = options, xid = packet.xid, siaddr = packet.siaddr)
     if args['debug']: print packet
-    packet = dhcp.dhcp_packet(opt53 = dhcp.OPT53_REQUEST, mac = args['mac'], options = options, xid = packet.xid)
     sock.sendto(packet.raw(), ("<broadcast>", 67))
 
     print "Recieving DHCP ACK"
@@ -63,6 +52,18 @@ def main(args):
         print "Timeout"
         return
     if args['debug']: print packet
+
+    print ""
+    print "Using IP Address: %s" % packet.yiaddr
+    option = packet.getopt(dhcp.OPTION_NETMASK)
+    if option is not None: print "Using Netmask: %s" % option.arg
+    option = packet.getopt(dhcp.OPTION_ROUTERS)
+    if option is not None: print "Using Routers: %s" % option.arg
+    option = packet.getopt(dhcp.OPTION_DNS_SERVERS)
+    if option is not None: print "Using DNS Servers: %s" % option.arg
+    option = packet.getopt(dhcp.OPTION_LEASE_TIME)
+    if option is not None: print "Using lease time: %s" % option.arg
+    print ""
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DHCP Client')
