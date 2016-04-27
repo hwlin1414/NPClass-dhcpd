@@ -43,7 +43,7 @@ def main(args):
                 flag = False
             if flag == False:
                 print "Warning: No IP available!"
-            using[ip] = {'time': int(time.time()) + 3600, 'xid': packet.xid}
+            using[ip] = {'time': int(time.time()) + args['lease'], 'xid': packet.xid}
             options = []
             options.append(dhcp.dhcp_option(dhcp.OPTION_REQUESTED_ADDRESS, ip))
             options.append(dhcp.dhcp_option(dhcp.OPTION_NETMASK, p[1]))
@@ -68,7 +68,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='DHCP Client')
     parser.add_argument('--debug', action='store_true', help='debug mode')
+    parser.add_argument('--lease', type=int, help='ip lease time', default=3600)
     args = vars(parser.parse_args())
-    #print("dhcp server start with args: ")
-    #print(args)
+    if args['debug']:
+        print("dhcp server start with args: ")
+        print(args)
     main(args)

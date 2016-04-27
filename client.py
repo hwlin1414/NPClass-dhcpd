@@ -81,6 +81,7 @@ if __name__ == "__main__":
         info = fcntl.ioctl(s.fileno(), 0x8927,  struct.pack('256s', args['interface'][:15]))
         args['mac'] = ''.join(['%02x' % ord(char) for char in info[18:24]])
         #args['mac'] = netifaces.ifaddresses(args['interface'])[netifaces.AF_LINK][0]['addr'].replace(":", "")
-    #print("dhcp client start with args: ")
-    #print(args)
+    if args['debug']:
+        print("dhcp client start with args: ")
+        print(args)
     main(args)
