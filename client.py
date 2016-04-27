@@ -38,18 +38,16 @@ def main(args):
     if args['debug']: print packet
     print ""
 
-    for option in packet.options:
-        if option.opt == dhcp.OPTION_REQUESTED_ADDRESS:
-            print "Using IP Address: %s" % option.arg
-    for option in packet.options:
-        if option.opt == dhcp.OPTION_NETMASK:
-            print "Using Netmask: %s" % option.arg
-    for option in packet.options:
-        if option.opt == dhcp.OPTION_ROUTERS:
-            print "Using Routers: %s" % str(option.arg)
-    for option in packet.options:
-        if option.opt == dhcp.OPTION_DNS_SERVERS:
-            print "Using DNS Server: %s" % str(option.arg)
+    option = packet.getopt(dhcp.OPTION_REQUESTED_ADDRESS)
+    if option is not None: print "Using IP Address: %s" % option.arg
+    option = packet.getopt(dhcp.OPTION_NETMASK)
+    if option is not None: print "Using Netmask: %s" % option.arg
+    option = packet.getopt(dhcp.OPTION_ROUTERS)
+    if option is not None: print "Using Routers: %s" % option.arg
+    option = packet.getopt(dhcp.OPTION_DNS_SERVERS)
+    if option is not None: print "Using DNS Servers: %s" % option.arg
+    option = packet.getopt(dhcp.OPTION_LEASE_TIME)
+    if option is not None: print "Using lease time: %s" % option.arg
     print ""
 
     print "Sending DHCP Request"
@@ -81,6 +79,8 @@ if __name__ == "__main__":
         info = fcntl.ioctl(s.fileno(), 0x8927,  struct.pack('256s', args['interface'][:15]))
         args['mac'] = ''.join(['%02x' % ord(char) for char in info[18:24]])
         #args['mac'] = netifaces.ifaddresses(args['interface'])[netifaces.AF_LINK][0]['addr'].replace(":", "")
+    else:
+        args['mac'] = args['mac'].replace(':', '').replace('.', '')
     if args['debug']:
         print("dhcp client start with args: ")
         print(args)

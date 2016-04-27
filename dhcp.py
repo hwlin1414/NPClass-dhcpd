@@ -176,6 +176,10 @@ class dhcp_packet(object):
         self.giaddr = "0.0.0.0" if not giaddr else giaddr
         self.chaddr = mac
         self.options = options
+    def getopt(self, opt):
+        for option in self.options:
+            if option.opt == opt: return option
+        return None
     def __str__(self):
         rep = ("Message type: %(mtype)d (%(opt53)s)\n" % {
             'mtype': self.opt53,
