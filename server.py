@@ -11,6 +11,15 @@ import time
 BUFSIZ = 4096
 myaddr = '192.168.1.1'
 pools = (
+    ({'circuit': 'u5566c', 'mac': 'cccc.cccc.cccc'}, {
+        'ip': ('140.123.111.111',),
+        'options': {
+            dhcp.OPTION_NETMASK: '255.255.255.0',
+            dhcp.OPTION_ROUTERS: ('140.123.111.250', ),
+            dhcp.OPTION_DNS_SERVERS: ('8.8.8.8', '8.8.4.4'),
+            dhcp.OPTION_LEASE_TIME: 5400
+        }
+    }),
     ({'circuit': 'u5566a'}, {
         'ip': ('140.123.239.230',),
         'options': {
