@@ -70,21 +70,21 @@ OPT53 = {
 DHCP_HEADER_FORMAT = "!4B1I2H4s4s4s4s16s64s128s"
 DHCP_HEADER_LENGTH = struct.calcsize(DHCP_HEADER_FORMAT)
 
-__dhcp_struct__ = struct.Struct(DHCP_HEADER_FORMAT)
+dhcp_struct = struct.Struct(DHCP_HEADER_FORMAT)
 
 def dhcp_option_from(raw):
     opt = ord(raw[0])
-    leng = ord(raw[1])
-    value = raw_options[2:leng+2]
     if opt == 0: return (1, None)
     elif opt == 255: return (0, None)
-    elif opt in (OPTION_MESSAGE_TYPE, ):
+    leng = ord(raw[1])
+    value = raw[2:leng+2]
+    if opt in (OPTION_MESSAGE_TYPE, ):
         return (leng + 2, dhcp_option(opt, ord(value)))
     elif opt in (OPTION_NETMASK, OPTION_SERVER_IDENTIFIER, OPTION_REQUESTED_ADDRESS):
         return (leng + 2, dhcp_option(opt, socket.inet_ntoa(value)))
     elif opt in (OPTION_ROUTERS, OPTION_NTP_SERVERS, OPTION_DNS_SERVERS):
         iplist = []
-        for off in xrange(0, length/4):
+        for off in xrange(0, leng/4):
             iplist +=  [socket.inet_ntoa(value[off*4:off*4+4])]
         return (leng + 2, dhcp_option(opt, iplist))
     elif opt in (OPTION_LEASE_TIME, OPTION_RENEW_TIME, OPTION_REBIND_TIME):
@@ -116,27 +116,33 @@ class dhcp_option(object):
         return packet
 
 def dhcp_packet_from(raw):
-    if len(raw) < DHCP_HEADER_LENGTH: return None
-    if raw_message[DHCP_HEADER_LENGTH:DHCP_HEADER_LENGTH+4] != MAGIC_COOKIE:
+    if len(raw) < DHCP_HEADER_LENGTH:
+        print "%d:%d" % (len(raw), DHCP_HeADER_LENGTH)
+        return None
+    if raw[DHCP_HEADER_LENGTH:DHCP_HEADER_LENGTH+4] != MAGIC_COOKIE:
         print("Magic Cookie Error!")
         return None
+    header = dhcp_struct.unpack(raw[:DHCP_HEADER_LENGTH])
     offset = DHCP_HEADER_LENGTH+4
     options = []
     while offset < len(raw):
         (leng, option) = dhcp_option_from(raw[offset:])
         if leng == 0: break
-        options += option
         offset += leng
-        return dhcp_packet(message_type=message_type, htype=raw[1],
-            hlen=raw[2], hops=raw[3],
-            xid=raw[4], secs=raw[5],
-            broadcast=True if raw[6]==1<<15 else False,
-            ciaddr=socket.inet_ntoa(raw[7]),
-            yiaddr=socket.inet_ntoa(raw[8]),
-            siaddr=socket.inet_ntoa(raw[9]),
-            giaddr=socket.inet_ntoa(raw[10]),
-            mac=raw[11][0:6].encode('hex'), sname=raw[12],
-            file=raw[13], options=options)
+        if option.opt == OPTION_MESSAGE_TYPE:
+            opt53 = option.arg
+        else:
+            options.append(option)
+    return dhcp_packet(opt53=opt53, htype=header[1],
+        hlen=header[2], hops=header[3],
+        xid=header[4], secs=header[5],
+        broadcast=True if header[6]==1<<15 else False,
+        ciaddr=socket.inet_ntoa(header[7]),
+        yiaddr=socket.inet_ntoa(header[8]),
+        siaddr=socket.inet_ntoa(header[9]),
+        giaddr=socket.inet_ntoa(header[10]),
+        mac=header[11][0:6].encode('hex'), sname=header[12],
+        file=header[13], options=options)
 
 class dhcp_packet(object):
     def __init__(self, opt53, mac, hlen=6, htype=1, hops=0, secs=0, xid=None, broadcast=True, 
@@ -168,7 +174,7 @@ class dhcp_packet(object):
         self.yiaddr = "0.0.0.0" if not yiaddr else yiaddr
         self.siaddr = "0.0.0.0" if not siaddr else siaddr
         self.giaddr = "0.0.0.0" if not giaddr else giaddr
-        self.chaddr = mac.decode('hex')
+        self.chaddr = mac
         self.options = options
     def __str__(self):
         rep = ("Message type: %(mtype)d (%(opt53)s)\n" % {
@@ -193,7 +199,7 @@ class dhcp_packet(object):
             'giaddr': self.giaddr
         })
         rep += ("\t[chaddr: %(chaddr)s, sname: \"%(sname)s\", file: \"%(file)s\"]\n" % {
-            'chaddr': self.chaddr.encode('hex'),
+            'chaddr': self.chaddr,
             'sname': self.sname,
             'file': self.file
         })
@@ -201,18 +207,19 @@ class dhcp_packet(object):
             rep += str(op)
         return rep
     def raw(self):
-        packet = __dhcp_struct__.pack(
+        packet = dhcp_struct.pack(
             self.op, self.htype, self.hlen, self.hops,
             self.xid, self.secs, self.flags,
             socket.inet_aton(self.ciaddr),
             socket.inet_aton(self.yiaddr), 
             socket.inet_aton(self.siaddr), 
             socket.inet_aton(self.giaddr),
-            self.chaddr,
+            self.chaddr.decode('hex'),
             self.sname,
             self.file
         )
         packet += MAGIC_COOKIE
+        packet += dhcp_option(OPTION_MESSAGE_TYPE, self.opt53).raw()
         for op in self.options:
             packet += op.raw()
         packet += chr(OPTION_END)
