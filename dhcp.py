@@ -97,7 +97,9 @@ class dhcp_option(object):
         self.opt = opt
         self.arg = arg
     def __str__(self):
-        return ("\t[options: %s, arg: %s]\n" % (OPTION[self.opt], self.arg))
+        if self.opt in OPTION:
+            return ("\t[options: %s, arg: %s]\n" % (OPTION[self.opt], self.arg))
+        return ("\t[options: %d, arg: %s]\n" % (self.opt, self.arg))
     def raw(self):
         packet = ''
         if self.opt in (OPTION_MESSAGE_TYPE, ):
@@ -117,7 +119,7 @@ class dhcp_option(object):
 
 def dhcp_packet_from(raw):
     if len(raw) < DHCP_HEADER_LENGTH:
-        print "%d:%d" % (len(raw), DHCP_HeADER_LENGTH)
+        print "%d:%d" % (len(raw), DHCP_HEADER_LENGTH)
         return None
     if raw[DHCP_HEADER_LENGTH:DHCP_HEADER_LENGTH+4] != MAGIC_COOKIE:
         print("Magic Cookie Error!")
